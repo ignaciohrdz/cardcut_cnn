@@ -4,9 +4,9 @@
 
 My interest in **pose estimation** grew during the summer of 2020. Since I finished my master's degree, I've worked mostly on supervised image classification, and I wanted to expand my knowledge.
 
-However, I didn't want to use famous datasets (MPII Human Pose, DensePose-COCO, PoseTrack...) because I don't have a powerful laptop. So I decided to create my own dataset related to one of my hobbies: magic!
+However, I didn't want to use famous datasets such as MPII Human Pose or DensePose-COCO because I don't have a powerful laptop (training on a 2012 CPU is not fun). So I decided to create my own dataset related to one of my hobbies: magic!
 
-I thought teaching an "AI" (I hate being so unspecific...) to **estimate the amount of cards in a packet** would be a nice side project. It may seem surprising to the reader, but [this](https://www.youtube.com/watch?v=nTxY9QUGXVE) is a common effect in card magic, with plenty of versions and authors.
+I thought teaching an "AI" (I hate being so unspecific...) to **estimate the amount of cards in a packet** would be a nice side project. It may seem surprising to the reader, but [this](https://www.youtube.com/watch?v=nTxY9QUGXVE) is a common effect in card magic, with plenty of versions and authors. I also tought it might be fun to create a simple app, but that is way too much for one person.
 
 ## Dataset
 
