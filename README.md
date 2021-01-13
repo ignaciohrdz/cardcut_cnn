@@ -50,6 +50,7 @@ The **overall loss function** (**L**) is:
 $$
 L = MSE(heatmap) + MSE(cards) + BCE(detection)
 $$
+
 The **metric** (**M**) is based on the number of cards predicted:
 $$
 M = MSE(cards)
