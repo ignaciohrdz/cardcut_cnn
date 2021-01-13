@@ -10,7 +10,9 @@ I thought teaching an "AI" (I hate being so unspecific...) to **estimate the amo
 
 ## Dataset
 
-I recorded around 52 videos of a pack with a different amount of cards (from 1 to 52). Then I subsampled the videos by one tenth and labelled the remaining frames.
+I recorded around 52 videos of a pack with a different amount of cards (from 1 to 52). Then I subsampled the videos by 1/20 and labelled the remaining frames.
+
+<img src="docs/Frame_labelled.png" style="zoom:150%;" />
 
 There are eight keypoints:
 

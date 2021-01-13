@@ -164,12 +164,12 @@ def show_mask_only_sample(output_masks, idx, save=True, waitTime=33):
     if save:
         cv2.imwrite('masks_output.jpg', (np.clip(grid,0,1)*255).astype(np.uint8))
 
-def create_mask_grid(masks):
+def create_mask_grid(masks, padding=((1,1),(1,1)), padding_values=((0.5, 0.5), (0.5, 0.5))):
     global points_colours, font, points_colours_abbreviations
 
     grid1_stack = []
     for i in range(4):
-        mask_i = np.pad(masks[:,:,i], ((1,1),(1,1)), 'constant', constant_values=((0.5, 0.5), (0.5, 0.5)))
+        mask_i = np.pad(masks[:,:,i], padding, 'constant', constant_values=padding_values)
         mask_i = cv2.cvtColor(mask_i, cv2.COLOR_GRAY2BGR)
         colour = points_colours[list(points_colours.keys())[i]]
         cv2.putText(mask_i, points_colours_abbreviations[list(points_colours.keys())[i]], (35, 8), font, 0.25, colour, thickness=1)
