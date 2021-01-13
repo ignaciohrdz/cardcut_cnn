@@ -6,11 +6,13 @@ My interest in **pose estimation** grew during the summer of 2020. Since I finis
 
 However, I didn't want to use famous datasets (MPII Human Pose, DensePose-COCO, PoseTrack...) because I don't have a powerful laptop. So I decided to create my own dataset related to one of my hobbies: magic!
 
-I thought of teaching an "AI" (I hate being so unspecific...) to **estimate the amount of cards in a packet**. It may seem surprising to the reader, but [this](https://www.youtube.com/watch?v=nTxY9QUGXVE) is a common effect in card magic, with plenty of versions and authors.
+I thought teaching an "AI" (I hate being so unspecific...) to **estimate the amount of cards in a packet** would be a nice side project. It may seem surprising to the reader, but [this](https://www.youtube.com/watch?v=nTxY9QUGXVE) is a common effect in card magic, with plenty of versions and authors.
 
 ## Dataset
 
-I recorded around 52 videos of a pack with a different amount of cards (from 1 to 52). I then subsampled the videos by one tenth and label the remaining frames. There are eight keypoints:
+I recorded around 52 videos of a pack with a different amount of cards (from 1 to 52). Then I subsampled the videos by one tenth and labelled the remaining frames.
+
+There are eight keypoints:
 
 - Upper left (face) corner
 - Upper right (face) corner
@@ -21,7 +23,7 @@ I recorded around 52 videos of a pack with a different amount of cards (from 1 t
 - Lower left (back) corner
 - Lower right (back) corner
 
-The keypoint locations are used to generate the heatmaps, which consist of small 2D-Gaussians. The coordinates of the peak values in each Gaussian/heatmap correspond to each keypoint location. This is very useful because it **makes the ground truth less sparse**.
+The keypoint locations are used to generate the heatmaps, which consist of *small 2D-Gaussians*. The coordinates of the peak values in each Gaussian/heatmap correspond to each keypoint location. This is very useful because it **makes the ground truth less sparse**.
 
 <img src="docs/heatmap.png" style="zoom:150%;" />
 
@@ -30,8 +32,9 @@ The keypoint locations are used to generate the heatmaps, which consist of small
 I decided to use an oversimplified UNet with some tweaks.
 
 - The main path of the model generates *eight heatmaps*, one for each keypoint. 
-- In order to predict the amount of cards of the packet, I decided to combine the output of the down-sampling part with the eight heatmaps (after some pooling to reduce the size of the maps).
-- I classify each keypoint as visible/not visible from the heatmaps. This should be used to decide which keypoint to show in the final output.
+- In order to predict the amount of cards of the packet, I decided to combine the output of the downsampling part with the eight heatmaps (after some pooling to reduce the size of the maps).
+    - To prevent backprop from doing weird things, I first *detach* these masks from the computation graph and then concatenate them with the encodings from the downsampling part (green block).
+- I finally predict the amount of cards (normalised, i.e. 0 to 1) and classify each keypoint as visible/not visible from the heatmaps. This is used to decide which keypoint is shown in the final output.
 
 This is what the model looks like:
 
