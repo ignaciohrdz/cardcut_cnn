@@ -22,16 +22,16 @@ class MyUNet(nn.Module):
         # Pooling and activations
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.adaptAvgPool = nn.AdaptiveAvgPool2d(1)
-        self.adaptMaxPool = nn.AdaptiveMaxPool2d((15,20))
+        self.adaptMaxPool = nn.AdaptiveMaxPool2d((15, 20))
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
         self.softmax = nn.Softmax(2)
 
         self.flat = nn.Flatten()
-        self.fc1 = nn.Linear(2400+filters[3],348)
-        self.fc2 = nn.Linear(348,174)
-        self.fc_out_detect = nn.Linear(174,8)
-        self.fc_out_ncards = nn.Linear(174,1)
+        self.fc1 = nn.Linear(2400+filters[3], 348)
+        self.fc2 = nn.Linear(348, 174)
+        self.fc_out_detect = nn.Linear(174, 8)
+        self.fc_out_ncards = nn.Linear(174, 1)
 
         self.temperature = temperature
 
@@ -72,7 +72,7 @@ class MyUNet(nn.Module):
         x_reg = self.fc2(x_reg)
 
         # Number of cards and point visibility (detected: yes/no)
-        out_ncards = self.sigmoid(self.fc_out_ncards(x_reg))
+        out_ncards = self.sigmoid(self.fc_out_ncards(x_reg))  # TODO: Convert to a probability distribution?
         out_visibility = self.sigmoid(self.fc_out_detect(x_reg))
 
         return x_mask, out_visibility, out_ncards

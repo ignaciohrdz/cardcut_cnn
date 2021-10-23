@@ -1,5 +1,9 @@
 videos/
 *.mp4
 *.pptx
+*.xml
+*.xml
+*.iml
 __pycache__/
 .vscode/
+.idea/

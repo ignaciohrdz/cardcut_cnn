@@ -65,15 +65,15 @@ train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampl
 validation_loader = torch.utils.data.DataLoader(dataset_val, batch_size=batch_size, sampler=valid_sampler, shuffle=False) # unshuffled, so we can always track the first sample of the first batch
 
 stage_loaders = {'train': train_loader,
-            'validation': validation_loader}
+                 'validation': validation_loader}
 
 model = MyUNet(temperature=0.25)
 model.to(device)
 
-optim = torch.optim.Adam(model.parameters(),lr=0.001)
-criterion_visible = torch.nn.BCELoss() # for point detection
-criterion_ncards = torch.nn.MSELoss(reduction='mean') # for value regression
-criterion_mask = torch.nn.MSELoss(reduction='none') # for keypoint heatmaps
+optim = torch.optim.Adam(model.parameters(), lr=0.001)
+criterion_visible = torch.nn.BCELoss()  # for point detection
+criterion_ncards = torch.nn.MSELoss(reduction='mean')  # for value regression
+criterion_mask = torch.nn.MSELoss(reduction='none')  # for keypoint heatmaps
 
 num_epochs = 120
 
@@ -99,7 +99,7 @@ for epoch in range(num_epochs):
                 loss_visibility = criterion_visible(out_detections, detections)
                 loss_ncards = criterion_ncards(out_value, value)
                 loss_mask = criterion_mask(out_mask, masks)
-                loss_mask = torch.sum(loss_mask, dim=[2,3]).mean()
+                loss_mask = torch.sum(loss_mask, dim=[2, 3]).mean()
                 loss = loss_visibility + loss_ncards + loss_mask
                 loss.backward()
                 optim.step()
@@ -117,15 +117,15 @@ for epoch in range(num_epochs):
             running_loss[stage] += loss.item()
 
         end = time.process_time()
-        epoch_loss = round(running_loss[stage]/len(stage_loaders[stage]),6)
+        epoch_loss = round(running_loss[stage]/len(stage_loaders[stage]), 6)
         running_loss_history[stage].append(epoch_loss)
 
         if stage == 'validation':
-            card_error_epoch = int(round(running_card_error/(len(stage_loaders[stage])*batch_size),1))
-            print('{} - Card error:  {} cards.'.format(stage,card_error_epoch))
+            card_error_epoch = int(round(running_card_error/(len(stage_loaders[stage])*batch_size), 1))
+            print('{} - Card error:  {} cards.'.format(stage, card_error_epoch))
             show_mask_only_sample(out_mask, 0, save=False)
 
-        print('{} - Epoch [{}/{}] ({} minutes {} seconds) loss: '.format(stage,epoch,num_epochs-1, (end-start)//60, int((end-start)%60)),epoch_loss)
+        print('{} - Epoch [{}/{}] ({} minutes {} seconds) loss: '.format(stage, epoch, num_epochs-1, (end-start) // 60, int((end-start) % 60)), epoch_loss)
 
 cv2.destroyAllWindows()
 torch.save(model.state_dict(), PATH)
@@ -133,13 +133,13 @@ torch.save(model.state_dict(), PATH)
 end_training = time.process_time()
 total_time = end_training - start_training
 total_time_hrs = int(total_time // 3600)
-total_time_mins = int((total_time % 3600)//60)
-total_time_secs = int((total_time % 3600)%60)
+total_time_mins = int((total_time % 3600) // 60)
+total_time_secs = int((total_time % 3600) % 60)
 print('Time elapsed: {} hours {} minutes {} seconds'.format(total_time_hrs, total_time_mins, total_time_secs))
 
-plt.plot(range(num_epochs),running_loss_history['train'])
-plt.plot(range(num_epochs), running_loss_history['validation'],'--')
-plt.legend(['Train','Validation'])
+plt.plot(range(num_epochs), running_loss_history['train'])
+plt.plot(range(num_epochs), running_loss_history['validation'], '--')
+plt.legend(['Train', 'Validation'])
 plt.title('Training: {} epochs ({} hrs {} min {} sec)'.format(num_epochs, total_time_hrs, total_time_mins, total_time_secs))
 plt.xlabel('Epoch')
 plt.ylabel('Combined Loss')
