@@ -14,17 +14,19 @@ from skimage import io, transform
 
 from PIL import Image
 
+
 def show_points(image, landmarks):
     """Show image with landmarks"""
     plt.imshow(image)
     plt.scatter(landmarks[:, 0], landmarks[:, 1], s=10, marker='.', c='r')
     plt.pause(0.001)  # pause a bit so that plots are updated
 
-class cardCutDataset(Dataset):
+
+class CardPoseDataset(Dataset):
     def __init__(self, csv_file, image_dir, mask_dir=None, transform=None):
         self.csv_file = csv_file
         self.data = pd.read_csv(csv_file, delimiter=",")
-        self.data = self.data[self.data['annotated']==1] # keep only the annotated rows
+        self.data = self.data[self.data['annotated'] == 1]  # keep only the annotated rows
         self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.transform = transform
@@ -38,20 +40,24 @@ class cardCutDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        img_path = os.path.join(self.image_dir,self.data.iloc[idx,0])
+        img_path = os.path.join(self.image_dir, self.data.iloc[idx, 0])
         image = Image.open(img_path)
         image = image.resize((image.width // 4, image.height // 4))
-        value = np.array([(self.data.iloc[idx,2]/self.data.iloc[idx,3])]).astype('float')
-        points = self.data.loc[idx,self.points_coordinates]
+        value = np.array([(self.data.iloc[idx, 2] / self.data.iloc[idx, 3])]).astype('float')
+        points = self.data.loc[idx, self.points_coordinates]
         # points = np.array([points]).astype('float').reshape(-1,2)
         points = np.array([points]).astype('float')
-        points_visible = np.array([self.data.loc[idx,self.points_visible]]).astype('float')
+        points_visible = np.array([self.data.loc[idx, self.points_visible]]).astype('float')
 
         # mask_path = os.path.join(self.mask_dir,self.data.loc[idx,'mask'])
         # mask = Image.open(mask_path)
 
         # sample = {'image': image, 'value': value, 'points': points, 'detections': points_visible, 'mask': mask}
-        sample = {'image': image, 'value': value, 'points': points, 'detections': points_visible}
+        sample = {'image': image,
+                  'value': value,
+                  'points': points,
+                  'detections': points_visible,
+                  'cards_counted': self.data.iloc[idx, 2] - 1}
 
         if self.transform:
             sample = self.transform(sample)
@@ -62,8 +68,8 @@ class cardCutDataset(Dataset):
 
     # Setting the image size from the first image of the dataset
     def set_image_shape_auto(self):
-        image_files = self.data.loc[0,:]
-        img_path = os.path.join(self.image_dir,image_files[0])
+        image_files = self.data.loc[0, :]
+        img_path = os.path.join(self.image_dir, image_files[0])
         image = Image.open(img_path)
         self.image_shape = [image.size[1], image.size[0]]
         total_rows = self.image_shape[0]
@@ -82,7 +88,7 @@ class cardCutDataset(Dataset):
 
     def compute_mean_std(self, idxes):
         # Remember: PIL is RGB, openCV is BGR
-        image_files = self.data.loc[idxes,:]
+        image_files = self.data.loc[idxes, :]
         mean = np.zeros(3)
         std = np.zeros(3)
         w = 0
@@ -90,25 +96,25 @@ class cardCutDataset(Dataset):
 
         # Mean
         for _, row in image_files.iterrows():
-            img_path = os.path.join(self.image_dir,row[0])
+            img_path = os.path.join(self.image_dir, row[0])
             image = Image.open(img_path)
             # image = image.resize((image.width//4, image.height//4))
             w = image.width
             h = image.height
-            image = np.array(image)/255
-            mean += image.sum(axis=(0,1))
-        mean = mean/(h*w*len(image_files))
+            image = np.array(image) / 255
+            mean += image.sum(axis=(0, 1))
+        mean = mean / (h * w * len(image_files))
 
         # Standard deviation
         for _, row in image_files.iterrows():
-            img_path = os.path.join(self.image_dir,row[0])
+            img_path = os.path.join(self.image_dir, row[0])
             image = Image.open(img_path)
             # image = image.resize((image.width//4, image.height//4))
-            image = np.array(image)/255
-            image = (image - mean)**2
-            std += image.sum(axis=(0,1))
+            image = np.array(image) / 255
+            image = (image - mean) ** 2
+            std += image.sum(axis=(0, 1))
 
-        std = np.sqrt(std/(h*w*len(image_files)-1))
+        std = np.sqrt(std / (h * w * len(image_files) - 1))
 
         return mean.tolist(), std.tolist()
 
@@ -124,10 +130,11 @@ class cardCutDataset(Dataset):
 
         for i in range(len(detections)):
             if detections[i] == 1:
-                center_row = int(points[2*i]*self.image_shape[0])
-                center_col = int(points[2*i + 1]*self.image_shape[1])
-                mask_i = (1/(sigma*np.sqrt(2*math.pi))) * np.exp(-((self.X_mask - center_row) ** 2 + (self.Y_mask - center_col) ** 2) / (2 * sigma ** 2))
-                mask_i = mask_i/mask_i.max()
+                center_row = int(points[2 * i] * self.image_shape[0])
+                center_col = int(points[2 * i + 1] * self.image_shape[1])
+                mask_i = (1 / (sigma * np.sqrt(2 * math.pi))) * np.exp(
+                    -((self.X_mask - center_row) ** 2 + (self.Y_mask - center_col) ** 2) / (2 * sigma ** 2))
+                mask_i = mask_i / mask_i.max()
                 masks.append(mask_i)
             else:
                 mask_i = np.zeros(self.image_shape)
@@ -142,13 +149,13 @@ class cardCutDataset(Dataset):
         return sample
 
     def create_list_points_by_index(self, idx):
-        row = self.data.loc[idx,:]
+        row = self.data.loc[idx, :]
         points_x = [int(row[c] * self.image_shape[0]) for c in self.data.columns.values if "_x" in c and row[c] > 0]
         points_y = [int(row[c] * self.image_shape[1]) for c in self.data.columns.values if "_y" in c and row[c] > 0]
-        contour = list(map(list,zip(points_y, points_x)))
+        contour = list(map(list, zip(points_y, points_x)))
         contour = [np.array(contour)]
         return contour
-    
+
     def create_list_points_by_row(self, row):
         points_x = [int(row[c] * self.image_shape[1]) for c in self.data.columns.values if "_x" in c and row[c] > 0]
         points_y = [int(row[c] * self.image_shape[0]) for c in self.data.columns.values if "_y" in c and row[c] > 0]
@@ -162,24 +169,24 @@ class cardCutDataset(Dataset):
         cv2.destroyAllWindows()
 
     def show_contour_by_index(self, idx):
-        row = self.data.loc[idx,:]
-        img_path = os.path.join(self.image_dir,row[0])
+        row = self.data.loc[idx, :]
+        img_path = os.path.join(self.image_dir, row[0])
         img = cv2.imread(img_path)
         contour = self.create_list_points_by_index(idx)
         draw = np.zeros(self.image_shape + [3], np.uint8)
         hull = cv2.convexHull(contour[0])
-        cv2.drawContours(draw, [hull], 0, (255,255,255), thickness=-1)
+        cv2.drawContours(draw, [hull], 0, (255, 255, 255), thickness=-1)
         cv2.imshow('Image', img)
         cv2.imshow('Contour (hull)', draw)
         cv2.waitKey()
 
     def show_contour_by_row(self, row):
-        img_path = os.path.join(self.image_dir,row[0])
+        img_path = os.path.join(self.image_dir, row[0])
         img = cv2.imread(img_path)
         contour = self.create_list_points_by_row(row)
         draw = np.zeros(self.image_shape + [3], np.uint8)
         hull = cv2.convexHull(contour[0])
-        cv2.drawContours(draw, [hull], 0, (255,255,255), thickness=-1)
+        cv2.drawContours(draw, [hull], 0, (255, 255, 255), thickness=-1)
         cv2.imshow('Image', img)
         cv2.imshow('Contour (hull)', draw)
         cv2.waitKey()
@@ -188,7 +195,7 @@ class cardCutDataset(Dataset):
         contour = self.create_list_points_by_index(idx)
         draw = np.zeros(self.image_shape + [3], np.uint8)
         hull = cv2.convexHull(contour[0])
-        cv2.drawContours(draw, [hull], 0, (255,255,255), thickness=-1)
+        cv2.drawContours(draw, [hull], 0, (255, 255, 255), thickness=-1)
         mask = cv2.cvtColor(draw, cv2.COLOR_BGR2GRAY)
         return mask
 
@@ -196,17 +203,17 @@ class cardCutDataset(Dataset):
         contour = self.create_list_points_by_row(row)
         draw = np.zeros(self.image_shape + [3], np.uint8)
         hull = cv2.convexHull(contour[0])
-        cv2.drawContours(draw, [hull], 0, (255,255,255), thickness=-1)
+        cv2.drawContours(draw, [hull], 0, (255, 255, 255), thickness=-1)
         mask = cv2.cvtColor(draw, cv2.COLOR_BGR2GRAY)
         return mask
 
     def create_mask_dataset(self):
         for idx, row in self.data.iterrows():
-            img_path = os.path.join(self.image_dir,row[0])
+            img_path = os.path.join(self.image_dir, row[0])
             mask_name = row[0].replace('.jpg', '_mask.jpg')
-            self.data.loc[idx,'mask'] = mask_name
-            mask_path = img_path.replace('.jpg', '_mask.jpg').replace('images','masks')
+            self.data.loc[idx, 'mask'] = mask_name
+            mask_path = img_path.replace('.jpg', '_mask.jpg').replace('images', 'masks')
             mask = self.make_contour_by_index(idx)
             cv2.imwrite(mask_path, mask)
-        
+
         self.data.to_csv(self.csv_file, index=False)

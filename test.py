@@ -14,21 +14,21 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision import transforms, utils
 
 import transforms
-from dataset import cardCutDataset
+from dataset import CardPoseDataset
 from losses import card_loss, get_accum_card_error
 from models import MyUNet
 from transforms import transforms_train, transforms_val
 from utils import *
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print('Testing on: ',device)
+print('Testing on: ', device)
 
-PATH = 'model/cardcut_cnn.pt'
+PATH = 'model/CardPose_cnn.pt'
 path_CSV = "data/cardpoints.csv"
 path_images = "data/images"
 path_masks = "data/masks"
-dataset = cardCutDataset(path_CSV, path_images, path_masks, transform=None)
-dataset_val = cardCutDataset(path_CSV, path_images, path_masks, transform=None)
+dataset = CardPoseDataset(path_CSV, path_images, path_masks, transform=None)
+dataset_val = CardPoseDataset(path_CSV, path_images, path_masks, transform=None)
 
 dataset.set_image_shape_manual(60, 80)
 dataset_val.set_image_shape_manual(60, 80)
@@ -36,7 +36,7 @@ dataset_val.set_image_shape_manual(60, 80)
 batch_size = 32
 validation_split = .2
 shuffle_dataset = True
-random_seed= 420
+random_seed = 420
 
 train_indices, val_indices = get_train_val_indices(dataset, random_seed, validation_split)
 
@@ -48,12 +48,14 @@ train_sampler = SubsetRandomSampler(train_indices)
 valid_sampler = SubsetRandomSampler(val_indices)
 
 train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampler=train_sampler)
-validation_loader = torch.utils.data.DataLoader(dataset_val, batch_size=batch_size, sampler=valid_sampler, shuffle=False) # unshuffled, so we can always track the first sample of the first batch
+# Unshuffled, so we can always track the first sample of the first batch
+validation_loader = torch.utils.data.DataLoader(dataset_val, batch_size=batch_size, sampler=valid_sampler,
+                                                shuffle=False)
 
 model = MyUNet(temperature=0.25)
 model.to(device)
 
-model.load_state_dict(torch.load(PATH))
+model.load_state_dict(torch.load(PATH, map_location=torch.device('cpu')))
 model.eval()
 model.to('cpu')
 

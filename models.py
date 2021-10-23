@@ -3,15 +3,18 @@ from torch import nn
 from torchvision import models
 import torch.nn.functional as F
 
+
 class MyUNet(nn.Module):
-    def __init__(self, filters=[64, 128, 256, 384], temperature=0.5):
+    def __init__(self, filters=[64, 128, 256, 384], temperature=0.5, n_bins=52):
         super(MyUNet, self).__init__()
 
+        self.n_bins = n_bins
+
         # Down path (normal convolutions)
-        self.conv1 = nn.Conv2d(3,filters[0],kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(filters[0],filters[1],kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(filters[1],filters[2],kernel_size=3, padding=1)
-        self.conv4 = nn.Conv2d(filters[2],filters[3],kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(3, filters[0], kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(filters[0], filters[1], kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(filters[1], filters[2], kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(filters[2], filters[3], kernel_size=3, padding=1)
 
         # Up path (upsampling + convolutions)
         self.upsample = nn.Upsample(mode='bilinear', scale_factor=2, align_corners=True)
@@ -28,18 +31,18 @@ class MyUNet(nn.Module):
         self.softmax = nn.Softmax(2)
 
         self.flat = nn.Flatten()
-        self.fc1 = nn.Linear(2400+filters[3], 348)
+        self.fc1 = nn.Linear(2400 + filters[3], 348)
         self.fc2 = nn.Linear(348, 174)
         self.fc_out_detect = nn.Linear(174, 8)
-        self.fc_out_ncards = nn.Linear(174, 1)
+        self.fc_out_ncards = nn.Linear(174, self.n_bins)
 
         self.temperature = temperature
 
-    def forward(self,x):
+    def forward(self, x):
         x = self.conv1(x)
         x_conv1 = self.relu(x)
         x_conv1 = self.maxpool(x_conv1)
-        
+
         x = self.conv2(x_conv1)
         x_conv2 = self.relu(x)
         x_conv2 = self.maxpool(x_conv2)
@@ -71,8 +74,10 @@ class MyUNet(nn.Module):
         x_reg = self.fc1(x_reg)
         x_reg = self.fc2(x_reg)
 
-        # Number of cards and point visibility (detected: yes/no)
-        out_ncards = self.sigmoid(self.fc_out_ncards(x_reg))  # TODO: Convert to a probability distribution?
+        # Number of cards: a probability distribution instead of a single scalar?)
+        # Based on this article: https://indatalabs.com/blog/head-pose-estimation-with-cv that mentions
+        # THIS paper: https://arxiv.org/pdf/1710.00925.pdf
+        out_ncards_distrib_logits = self.fc_out_ncards(x_reg)
+        # Point visibility (detected: yes/no)
         out_visibility = self.sigmoid(self.fc_out_detect(x_reg))
-
-        return x_mask, out_visibility, out_ncards
+        return x_mask, out_visibility, out_ncards_distrib_logits

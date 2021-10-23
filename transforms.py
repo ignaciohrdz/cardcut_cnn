@@ -9,91 +9,101 @@ from torchvision import transforms
 
 from PIL import Image
 
+
 class Normalise(object):
     def __init__(self, mean, std):
         self.mean = mean
         self.std = mean
         self.t = transforms.Normalize(self.mean, self.std)
-    
+
     def __call__(self, sample):
         sample['image'] = self.t(sample['image'])
         return sample
+
 
 class ColorJitter(object):
     def __init__(self, p=0.5, brightness=0, contrast=0, saturation=0, hue=0):
         self.p = p
         self.tf = transforms.ColorJitter(brightness=brightness,
-                                        contrast=contrast,
-                                        saturation=saturation,
-                                        hue=hue)
+                                         contrast=contrast,
+                                         saturation=saturation,
+                                         hue=hue)
+
     def __call__(self, sample):
         r = np.random.random_sample()
         if r > self.p:
             sample['image'] = self.tf(sample['image'])
         return sample
 
+
 class ColorToGrayscale(object):
     def __init__(self, p=0.8):
         self.p = p
+
     def __call__(self, sample):
         r = np.random.random_sample()
         if r > self.p:
             image = np.array(sample['image'].convert('LA'))
-            image = np.stack([image[:,:,0],image[:,:,0],image[:,:,0]],axis=2)
+            image = np.stack([image[:, :, 0], image[:, :, 0], image[:, :, 0]], axis=2)
             sample['image'] = Image.fromarray(image)
         return sample
+
 
 class RandomHorizontalFlip(object):
     def __init__(self, p=0.5):
         self.p = p
+
     def __call__(self, sample):
         r = np.random.random_sample()
         if r > self.p:
             image = sample['image'].transpose(Image.FLIP_LEFT_RIGHT)
             points = sample['points']
-            points[0,1::2] = (1 - points[0,1::2])*(points[0,1::2]>0).astype('float')
+            points[0, 1::2] = (1 - points[0, 1::2]) * (points[0, 1::2] > 0).astype('float')
             new_points = np.zeros_like(points)
             for k in range(4):
-                new_points[0,k*4] = points[0,(k*4)+2] # Swap X
-                new_points[0,k*4+1] = points[0,(k*4)+3] # Swap Y
-                new_points[0,(k*4)+2] = points[0,(k*4)] # Swap X
-                new_points[0,(k*4)+3] = points[0,(k*4)+1] # Swap Y
-            
+                new_points[0, k * 4] = points[0, (k * 4) + 2]  # Swap X
+                new_points[0, k * 4 + 1] = points[0, (k * 4) + 3]  # Swap Y
+                new_points[0, (k * 4) + 2] = points[0, (k * 4)]  # Swap X
+                new_points[0, (k * 4) + 3] = points[0, (k * 4) + 1]  # Swap Y
+
             detections = sample['detections']
             new_detections = np.zeros_like(detections)
-            for k in range(4): # Swap left for right detections and viceversa
-                new_detections[0,k*2] = detections[0,k*2+1]
-                new_detections[0,k*2+1] = detections[0,k*2]
-            
+            for k in range(4):  # Swap left for right detections and viceversa
+                new_detections[0, k * 2] = detections[0, k * 2 + 1]
+                new_detections[0, k * 2 + 1] = detections[0, k * 2]
+
             sample['image'] = image
             sample['points'] = new_points
             sample['detections'] = new_detections
-        
+
         return sample
+
 
 class RandomVerticalFlip(object):
     def __init__(self, p=0.5):
         self.p = p
+
     def __call__(self, sample):
         r = np.random.random_sample()
         if r > self.p:
             image = sample['image'].transpose(Image.FLIP_TOP_BOTTOM)
             points = sample['points']
-            points[0,::2] = (1 - points[0,::2])*(points[0,::2]>0).astype('float')
+            points[0, ::2] = (1 - points[0, ::2]) * (points[0, ::2] > 0).astype('float')
             new_points = np.zeros_like(points)
-            new_points[0,:8] = points[0,8:] # Swap top and bottom
-            new_points[0,8:] = points[0,:8] # Swap top and bottom
-            
+            new_points[0, :8] = points[0, 8:]  # Swap top and bottom
+            new_points[0, 8:] = points[0, :8]  # Swap top and bottom
+
             detections = sample['detections']
             new_detections = np.zeros_like(detections)
-            new_detections[0,:4] = detections[0,4:] # Swap top and bottom
-            new_detections[0,4:] = detections[0,:4] # Swap top and bottom
+            new_detections[0, :4] = detections[0, 4:]  # Swap top and bottom
+            new_detections[0, 4:] = detections[0, :4]  # Swap top and bottom
 
             sample['image'] = image
             sample['points'] = new_points
             sample['detections'] = new_detections
-        
+
         return sample
+
 
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
@@ -104,7 +114,7 @@ class ToTensor(object):
         # swap color axis because
         # numpy image: H x W x C
         # torch image: C X H X W
-        image = np.array(image).transpose((2, 0, 1))/255
+        image = np.array(image).transpose((2, 0, 1)) / 255
         sample['image'] = torch.from_numpy(image).type(torch.float)
         sample['value'] = torch.from_numpy(value).type(torch.float)
         sample['points'] = torch.from_numpy(points).type(torch.float)
@@ -112,21 +122,23 @@ class ToTensor(object):
 
         return sample
 
-transforms_train = transforms.Compose([
-                                ColorJitter(p=0.2, brightness=0.25, saturation=0.5, contrast=0.5, hue=0.25),
-                                # RandomHorizontalFlip(p=0.5),
-                                transforms.RandomChoice([
-                                    RandomHorizontalFlip(),
-                                    RandomVerticalFlip()]),
-                                ColorToGrayscale(),
-                                ToTensor(),
-                                # Normalise(mean, std)
-                                ])
 
-transforms_val= transforms.Compose([
-                                ToTensor(),
-                                # Normalise(mean, std)
-                                ])
+transforms_train = transforms.Compose([
+    ColorJitter(p=0.2, brightness=0.25, saturation=0.5, contrast=0.5, hue=0.25),
+    # RandomHorizontalFlip(p=0.5),
+    transforms.RandomChoice([
+        RandomHorizontalFlip(),
+        RandomVerticalFlip()]),
+    ColorToGrayscale(),
+    ToTensor(),
+    # Normalise(mean, std)
+])
+
+transforms_val = transforms.Compose([
+    ToTensor(),
+    # Normalise(mean, std)
+])
+
 
 # UNUSED
 class Rescale(object):
@@ -193,9 +205,8 @@ class RandomCrop(object):
         left = np.random.randint(0, w - new_w)
 
         image = image[top: top + new_h,
-                      left: left + new_w]
+                left: left + new_w]
 
         points = points - [left, top]
 
         return {'image': image, 'points': points}
-
