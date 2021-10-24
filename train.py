@@ -27,6 +27,7 @@ PATH = 'model/CardPose_cnn.pt'
 path_CSV = "data/cardpoints.csv"
 path_images = "data/images"
 path_masks = "data/masks"
+path_figures = "figures"
 dataset = CardPoseDataset(path_CSV, path_images, path_masks, transform=None)
 dataset_val = CardPoseDataset(path_CSV, path_images, path_masks, transform=None)
 
@@ -73,7 +74,7 @@ validation_loader = torch.utils.data.DataLoader(dataset_val,
 stage_loaders = {'train': train_loader,
                  'validation': validation_loader}
 
-model = MyUNet(temperature=0.25)
+model = MyUNet(temperature=0.5)
 model.to(device)
 
 optim = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -82,13 +83,25 @@ criterion_visible = torch.nn.BCELoss()  # for point detection
 criterion_ncards_prob = torch.nn.CrossEntropyLoss()  # for number of card probability
 criterion_mask = torch.nn.MSELoss(reduction='none')  # for keypoint heatmaps
 
-num_epochs = 120
+num_epochs = 25
 
 running_loss_history = {'train': [], 'validation': []}
+running_loss_history_separate = {'train': {'loss_CE': [],
+                                   'loss_mask': [],
+                                   'loss_visibility': []},
+                         'validation': {'loss_CE': [],
+                                        'loss_mask': [],
+                                        'loss_visibility': []}}
 start_training = time.process_time()
 
 for epoch in range(num_epochs):
     running_loss = {'train': 0.0, 'validation': 0.0}
+    running_loss_separate = {'train': {'loss_CE': 0.0,
+                                       'loss_mask': 0.0,
+                                       'loss_visibility': 0.0},
+                             'validation': {'loss_CE': 0.0,
+                                            'loss_mask': 0.0,
+                                            'loss_visibility': 0.0}}
     running_card_error = 0.0
     for stage in stage_loaders.keys():
         start = time.process_time()
@@ -125,10 +138,17 @@ for epoch in range(num_epochs):
                     running_card_error += get_accum_card_error(value, torch.argmax(out_value_prob, axis=1).unsqueeze(1) / out_value_prob.shape[1]).item()
 
             running_loss[stage] += loss.item()
+            running_loss_separate[stage]['loss_CE'] += loss_ncards_prob.item()
+            running_loss_separate[stage]['loss_mask'] += loss_mask.item()
+            running_loss_separate[stage]['loss_visibility'] += loss_visibility.item()
 
         end = time.process_time()
         epoch_loss = round(running_loss[stage] / len(stage_loaders[stage]), 6)
         running_loss_history[stage].append(epoch_loss)
+
+        running_loss_history_separate[stage]['loss_CE'].append(round(running_loss_separate[stage]['loss_CE'] / len(stage_loaders[stage]), 6))
+        running_loss_history_separate[stage]['loss_mask'].append(round(running_loss_separate[stage]['loss_mask'] / len(stage_loaders[stage]), 6))
+        running_loss_history_separate[stage]['loss_visibility'].append(round(running_loss_separate[stage]['loss_visibility'] / len(stage_loaders[stage]), 6))
 
         if stage == 'validation':
             card_error_epoch = int(round(running_card_error / (len(stage_loaders[stage]) * batch_size), 1))
@@ -153,7 +173,38 @@ plt.legend(['Train', 'Validation'])
 plt.title('Training: {} epochs ({} hrs {} min {} sec)'.format(num_epochs, total_time_hrs, total_time_mins, total_time_secs))
 plt.xlabel('Epoch')
 plt.ylabel('Combined Loss')
-plt.savefig('training.png')
+plt.savefig(os.path.join(path_figures, 'training_loss.png'))
+plt.show(block=False)
+plt.pause(10)
+plt.close()
+
+plt.subplot(1, 3, 1)
+plt.plot(range(num_epochs), running_loss_history_separate['train']['loss_CE'])
+plt.plot(range(num_epochs), running_loss_history_separate['validation']['loss_CE'], '--')
+plt.legend(['Train', 'Validation'])
+plt.title('CE (card count)')
+plt.xlabel('Epoch')
+plt.ylabel('CE Loss')
+
+plt.subplot(1, 3, 2)
+plt.plot(range(num_epochs), running_loss_history_separate['train']['loss_mask'])
+plt.plot(range(num_epochs), running_loss_history_separate['validation']['loss_mask'], '--')
+plt.legend(['Train', 'Validation'])
+plt.title('MSE (Heatmaps)')
+plt.xlabel('Epoch')
+plt.ylabel('Mask Loss')
+
+plt.subplot(1, 3, 3)
+plt.plot(range(num_epochs), running_loss_history_separate['train']['loss_visibility'])
+plt.plot(range(num_epochs), running_loss_history_separate['validation']['loss_visibility'], '--')
+plt.legend(['Train', 'Validation'])
+plt.title('MSE (Visibility)')
+plt.xlabel('Epoch')
+plt.ylabel('Visibility Loss')
+
+plt.suptitle('Training: {} epochs ({} hrs {} min {} sec)'.format(num_epochs, total_time_hrs, total_time_mins, total_time_secs))
+plt.tight_layout()
+plt.savefig(os.path.join(path_figures, 'training_loss_visibility.png'))
 plt.show(block=False)
 plt.pause(10)
 plt.close()

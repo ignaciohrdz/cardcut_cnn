@@ -4,6 +4,7 @@ from torchvision import models
 import torch.nn.functional as F
 
 
+# Read this paper? https://arxiv.org/pdf/1804.06208
 class MyUNet(nn.Module):
     def __init__(self, filters=[64, 128, 256, 384], temperature=0.5, n_bins=52):
         super(MyUNet, self).__init__()
@@ -31,10 +32,10 @@ class MyUNet(nn.Module):
         self.softmax = nn.Softmax(2)
 
         self.flat = nn.Flatten()
-        self.fc1 = nn.Linear(2400 + filters[3], 348)
-        self.fc2 = nn.Linear(348, 174)
-        self.fc_out_detect = nn.Linear(174, 8)
-        self.fc_out_ncards = nn.Linear(174, self.n_bins)
+        self.fc1 = nn.Linear(2400 + filters[3], 512)
+        self.fc2 = nn.Linear(512, 512)
+        self.fc_out_detect = nn.Linear(512, 8)
+        self.fc_out_ncards = nn.Linear(512, self.n_bins)
 
         self.temperature = temperature
 
@@ -74,10 +75,13 @@ class MyUNet(nn.Module):
         x_reg = self.fc1(x_reg)
         x_reg = self.fc2(x_reg)
 
-        # Number of cards: a probability distribution instead of a single scalar?)
-        # Based on this article: https://indatalabs.com/blog/head-pose-estimation-with-cv that mentions
-        # THIS paper: https://arxiv.org/pdf/1710.00925.pdf
-        out_ncards_distrib_logits = self.fc_out_ncards(x_reg)
         # Point visibility (detected: yes/no)
         out_visibility = self.sigmoid(self.fc_out_detect(x_reg))
+
+        # Number of cards: a probability distribution instead of a single scalar?)
+        # Based on these sources:
+        #   - https://indatalabs.com/blog/head-pose-estimation-with-cv
+        #   - THIS paper: https://arxiv.org/pdf/1710.00925.pdf
+        out_ncards_distrib_logits = self.fc_out_ncards(x_reg) / self.temperature
+
         return x_mask, out_visibility, out_ncards_distrib_logits

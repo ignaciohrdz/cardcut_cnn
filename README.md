@@ -26,6 +26,7 @@ There are eight keypoints:
 - Lower right (back) corner
 
 The keypoint locations are used to generate the heatmaps, which consist of *small 2D-Gaussians*. The coordinates of the peak values in each Gaussian/heatmap correspond to each keypoint location. This is very useful because it **makes the ground truth less sparse**.
+(Warning: the following heatmap was resized and doesn't look too good).
 
 <img src="docs/heatmap.png" style="zoom:150%;" />
 
@@ -76,6 +77,8 @@ With a *mean card error* (**M**) of 4 cards. Not bad for a simple model!
 
 - I should definitely move onto more powerful yet small models. Maybe MobileNet?
 - Getting more data is a must.
+- I will probably try separating the pose estimation stage from the prediction of the number of cards.
+- ...
 - Why am I still doing this?
 
 ## References

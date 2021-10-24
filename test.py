@@ -52,7 +52,7 @@ train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampl
 validation_loader = torch.utils.data.DataLoader(dataset_val, batch_size=batch_size, sampler=valid_sampler,
                                                 shuffle=False)
 
-model = MyUNet(temperature=0.25)
+model = MyUNet(temperature=0.5)
 model.to(device)
 
 model.load_state_dict(torch.load(PATH, map_location=torch.device('cpu')))
