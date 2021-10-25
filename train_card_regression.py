@@ -37,6 +37,7 @@ X_train = train_data[feature_cols]
 y_train = train_data['cards_counted'] - lowest_count
 
 # Fitting a MaxEnt model to predict the probability of the number of cards
+# This was very useful https://cla2019.github.io/scikit_classification.pdf
 clf = LogisticRegression(random_state=0, max_iter=300).fit(X_train, y_train)
 y_pred = clf.predict(X_val)
 
