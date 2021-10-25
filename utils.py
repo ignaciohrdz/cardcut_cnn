@@ -31,6 +31,40 @@ points_colours_abbreviations = {'upper_left_face_visible': 'ulf',
                                 'lower_left_back_visible': 'llb',
                                 'lower_right_back_visible': 'lrb'}
 
+card_edges = {'upper_back_edge': ['upper_left_back_x',
+                                  'upper_left_back_y',
+                                  'upper_right_back_x',
+                                  'upper_right_back_y'],
+              'upper_face_edge': ['upper_left_face_x',
+                                  'upper_left_face_y',
+                                  'upper_right_face_x',
+                                  'upper_right_face_y'],
+              'upper_left_edge': ['upper_left_face_x',
+                                  'upper_left_face_y',
+                                  'upper_left_back_x',
+                                  'upper_left_back_y'],
+              'upper_right_edge': ['upper_right_face_x',
+                                   'upper_right_face_y',
+                                   'upper_right_back_x',
+                                   'upper_right_back_y'],
+              'lower_back_edge': ['lower_left_back_x',
+                                  'lower_left_back_y',
+                                  'lower_right_back_x',
+                                  'lower_right_back_y'],
+              'lower_face_edge': ['lower_left_face_x',
+                                  'lower_left_face_y',
+                                  'lower_right_face_x',
+                                  'lower_right_face_y'],
+              'lower_left_edge': ['lower_left_face_x',
+                                  'lower_left_face_y',
+                                  'lower_left_back_x',
+                                  'lower_left_back_y'],
+              'lower_right_edge': ['lower_right_face_x',
+                                   'lower_right_face_y',
+                                   'lower_right_back_x',
+                                   'lower_right_back_y'],
+              }
+
 
 # TODO: Fix the issue with denormalisation?
 def show_learning_sample_random(inputs, values, output_value, output_detections, output_points, mean, std, waitTime=0):
@@ -222,7 +256,7 @@ def get_points_from_mask(masks):
     mask_points = np.stack(mask_points, axis=1)
     points = mask_points.reshape(-1, 2)
 
-    return points  # normalised! they still need to be muultiplied by the real shape of the image
+    return points  # normalised! they still need to be multiplied by the real shape of the image
 
 
 def show_model_validation(model, validation_loader, mean, std, waitTime=0):
@@ -261,3 +295,16 @@ def get_train_val_indices(dataset, random_seed, validation_split, shuffle_datase
     train_indices, val_indices = indices[split:], indices[:split]
 
     return train_indices, val_indices
+
+
+def get_point_edges(data):
+    global card_edges
+    edge_cols = []
+    for edge, pts in card_edges.items():
+        ptAx, ptAy = data[pts[0]], data[pts[1]]
+        ptBx, ptBy = data[pts[2]], data[pts[3]]
+        norm = np.linalg.norm(np.array([ptAx - ptBx, ptAy - ptBy]).T, axis=1)
+        data[edge] = norm
+        data.loc[(ptAx == 0) | (ptAy == 0) | (ptBx == 0) | (ptBy == 0), edge] = -1
+        edge_cols.append(edge)
+    return data, edge_cols
