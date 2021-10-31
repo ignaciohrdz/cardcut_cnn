@@ -33,7 +33,7 @@ class CardPoseCNN(nn.Module):
         self.softmax = nn.Softmax(2)
 
         self.flat = nn.Flatten()
-        self.fc1 = nn.Linear(2400 + filters[3], 512)
+        self.fc1 = nn.Linear(2400 + filters[3], 512)  # 2400 = 15 x 20 (from Adapt Max Pool)
         self.fc2 = nn.Linear(512, 512)
         self.fc_out_detect = nn.Linear(512, 8)
         self.fc_out_ncards = nn.Linear(512, self.n_bins) if n_bins > 0 else nn.Linear(512, 1)
