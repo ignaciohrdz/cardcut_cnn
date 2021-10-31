@@ -16,7 +16,7 @@ from torchvision import transforms, utils
 import transforms
 from dataset import CardPoseDataset
 from losses import card_loss, get_accum_card_error
-from models import MyUNet
+from models import CardPoseCNN
 from transforms import transforms_train, transforms_val
 from utils import *
 
@@ -40,6 +40,7 @@ dataset_val.set_image_shape_manual(60, 80)
 # dataset.create_mask_dataset()
 # dataset.show_dataset_contours()
 
+num_epochs = 25
 batch_size = 32
 validation_split = .2
 shuffle_dataset = True
@@ -74,32 +75,33 @@ validation_loader = torch.utils.data.DataLoader(dataset_val,
 stage_loaders = {'train': train_loader,
                  'validation': validation_loader}
 
-model = MyUNet(temperature=0.5)
+n_cards_bins = 52  # Use -1 to predict a single scalar instead of N logits
+model = CardPoseCNN(temperature=0.5, n_bins=n_cards_bins)
 model.to(device)
 
 optim = torch.optim.Adam(model.parameters(), lr=0.001)
-criterion_visible = torch.nn.BCELoss()  # for point detection
-# criterion_ncards = torch.nn.MSELoss(reduction='mean')  # for value regression (number of cards)
-criterion_ncards_prob = torch.nn.CrossEntropyLoss()  # for number of card probability
-criterion_mask = torch.nn.MSELoss(reduction='none')  # for keypoint heatmaps
-
-num_epochs = 25
+# For point detection (like binary classification)
+criterion_visible = torch.nn.BCELoss()
+# For number of cards: value regression or probability
+criterion_ncards = torch.nn.CrossEntropyLoss() if n_cards_bins > 0 else torch.nn.MSELoss(reduction='mean')
+# For keypoint heatmaps
+criterion_mask = torch.nn.MSELoss(reduction='none')
 
 running_loss_history = {'train': [], 'validation': []}
-running_loss_history_separate = {'train': {'loss_CE': [],
-                                   'loss_mask': [],
-                                   'loss_visibility': []},
-                         'validation': {'loss_CE': [],
-                                        'loss_mask': [],
-                                        'loss_visibility': []}}
+running_loss_history_separate = {'train': {'loss_cards': [],
+                                           'loss_mask': [],
+                                           'loss_visibility': []},
+                                 'validation': {'loss_cards': [],
+                                                'loss_mask': [],
+                                                'loss_visibility': []}}
 start_training = time.process_time()
 
 for epoch in range(num_epochs):
     running_loss = {'train': 0.0, 'validation': 0.0}
-    running_loss_separate = {'train': {'loss_CE': 0.0,
+    running_loss_separate = {'train': {'loss_cards': 0.0,
                                        'loss_mask': 0.0,
                                        'loss_visibility': 0.0},
-                             'validation': {'loss_CE': 0.0,
+                             'validation': {'loss_cards': 0.0,
                                             'loss_mask': 0.0,
                                             'loss_visibility': 0.0}}
     running_card_error = 0.0
@@ -112,33 +114,32 @@ for epoch in range(num_epochs):
             detections = batch['detections'].squeeze().to(device)
             masks = batch['mask_stack'].to(device)
             cards_counted = batch['cards_counted'].to(device)
-
-            if stage == 'train':
+            n_cards = cards_counted if n_cards_bins > 0 else value
+            if stage == 'train':  # training
                 model.train()
                 optim.zero_grad()
-                out_mask, out_detections, out_value_prob = model(inputs)
+                out_mask, out_detections, out_value = model(inputs)
                 loss_visibility = criterion_visible(out_detections, detections)
-                # loss_ncards = criterion_ncards(out_value, value)
-                loss_ncards_prob = criterion_ncards_prob(out_value_prob, cards_counted)
+                loss_ncards = criterion_ncards(out_value, n_cards)
                 loss_mask = criterion_mask(out_mask, masks)
                 loss_mask = torch.sum(loss_mask, dim=[2, 3]).mean()
-                loss = loss_visibility + loss_ncards_prob + loss_mask
+                loss = loss_visibility + loss_ncards + loss_mask
                 loss.backward()
                 optim.step()
             else:  # validation
                 model.eval()
                 with torch.no_grad():
-                    out_mask, out_detections, out_value_prob = model(inputs)
+                    out_mask, out_detections, out_value = model(inputs)
                     loss_visibility = criterion_visible(out_detections, detections)
-                    # loss_ncards = criterion_ncards(out_value, value)
-                    loss_ncards_prob = criterion_ncards_prob(out_value_prob, cards_counted)
+                    loss_ncards = criterion_ncards(out_value, n_cards)
                     loss_mask = criterion_mask(out_mask, masks)
                     loss_mask = torch.sum(loss_mask, dim=[2, 3]).mean()
-                    loss = loss_visibility + loss_ncards_prob + loss_mask
-                    running_card_error += get_accum_card_error(value, torch.argmax(out_value_prob, axis=1).unsqueeze(1) / out_value_prob.shape[1]).item()
+                    loss = loss_visibility + loss_ncards + loss_mask
+                    card_num = torch.argmax(out_value, axis=1).unsqueeze(1) / n_cards_bins if n_cards_bins > 0 else out_value
+                    running_card_error += get_accum_card_error(value, card_num).item()
 
             running_loss[stage] += loss.item()
-            running_loss_separate[stage]['loss_CE'] += loss_ncards_prob.item()
+            running_loss_separate[stage]['loss_cards'] += loss_ncards.item()
             running_loss_separate[stage]['loss_mask'] += loss_mask.item()
             running_loss_separate[stage]['loss_visibility'] += loss_visibility.item()
 
@@ -146,7 +147,7 @@ for epoch in range(num_epochs):
         epoch_loss = round(running_loss[stage] / len(stage_loaders[stage]), 6)
         running_loss_history[stage].append(epoch_loss)
 
-        running_loss_history_separate[stage]['loss_CE'].append(round(running_loss_separate[stage]['loss_CE'] / len(stage_loaders[stage]), 6))
+        running_loss_history_separate[stage]['loss_cards'].append(round(running_loss_separate[stage]['loss_cards'] / len(stage_loaders[stage]), 6))
         running_loss_history_separate[stage]['loss_mask'].append(round(running_loss_separate[stage]['loss_mask'] / len(stage_loaders[stage]), 6))
         running_loss_history_separate[stage]['loss_visibility'].append(round(running_loss_separate[stage]['loss_visibility'] / len(stage_loaders[stage]), 6))
 
@@ -179,10 +180,10 @@ plt.pause(10)
 plt.close()
 
 plt.subplot(1, 3, 1)
-plt.plot(range(num_epochs), running_loss_history_separate['train']['loss_CE'])
-plt.plot(range(num_epochs), running_loss_history_separate['validation']['loss_CE'], '--')
+plt.plot(range(num_epochs), running_loss_history_separate['train']['loss_cards'])
+plt.plot(range(num_epochs), running_loss_history_separate['validation']['loss_cards'], '--')
 plt.legend(['Train', 'Validation'])
-plt.title('CE (card count)')
+plt.title('N_Card loss (card count)')
 plt.xlabel('Epoch')
 plt.ylabel('CE Loss')
 
@@ -204,7 +205,7 @@ plt.ylabel('Visibility Loss')
 
 plt.suptitle('Training: {} epochs ({} hrs {} min {} sec)'.format(num_epochs, total_time_hrs, total_time_mins, total_time_secs))
 plt.tight_layout()
-plt.savefig(os.path.join(path_figures, 'training_loss_visibility.png'))
+plt.savefig(os.path.join(path_figures, 'training_loss_all.png'))
 plt.show(block=False)
 plt.pause(10)
 plt.close()

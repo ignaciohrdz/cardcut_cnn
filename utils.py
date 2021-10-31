@@ -274,8 +274,9 @@ def show_model_validation(model, validation_loader, mean, std, waitTime=0):
         with torch.no_grad():
             out_mask, out_detections, out_value = model(inputs)
 
-        show_points_from_mask_sample_batch(inputs, value, out_value, out_detections, out_mask, mean, std,
-                                           waitTime=waitTime)
+        show_points_from_mask_sample_batch(inputs, value,
+                                           out_value, out_detections, out_mask,
+                                           mean, std, waitTime=waitTime)
         running_card_error += get_accum_card_error(value, out_value).item()
         cv2.destroyAllWindows()
 
@@ -303,8 +304,9 @@ def get_point_edges(data):
     for edge, pts in card_edges.items():
         ptAx, ptAy = data[pts[0]], data[pts[1]]
         ptBx, ptBy = data[pts[2]], data[pts[3]]
-        norm = np.linalg.norm(np.array([ptAx - ptBx, ptAy - ptBy]).T, axis=1)
+        vector = np.array([ptAx - ptBx, ptAy - ptBy]).T
+        norm = np.linalg.norm(vector, axis=1)
         data[edge] = norm
-        data.loc[(ptAx == 0) | (ptAy == 0) | (ptBx == 0) | (ptBy == 0), edge] = -1
+        data.loc[(ptAx == 0) | (ptAy == 0) | (ptBx == 0) | (ptBy == 0), edge] = 0  # Maybe -1 was not working?
         edge_cols.append(edge)
     return data, edge_cols

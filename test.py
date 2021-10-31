@@ -16,7 +16,7 @@ from torchvision import transforms, utils
 import transforms
 from dataset import CardPoseDataset
 from losses import card_loss, get_accum_card_error
-from models import MyUNet
+from models import CardPoseCNN
 from transforms import transforms_train, transforms_val
 from utils import *
 
@@ -52,7 +52,7 @@ train_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, sampl
 validation_loader = torch.utils.data.DataLoader(dataset_val, batch_size=batch_size, sampler=valid_sampler,
                                                 shuffle=False)
 
-model = MyUNet(temperature=0.5)
+model = CardPoseCNN(temperature=0.5)
 model.to(device)
 
 model.load_state_dict(torch.load(PATH, map_location=torch.device('cpu')))

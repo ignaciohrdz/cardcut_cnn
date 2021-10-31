@@ -5,11 +5,12 @@ import torch.nn.functional as F
 
 
 # Read this paper? https://arxiv.org/pdf/1804.06208
-class MyUNet(nn.Module):
+class CardPoseCNN(nn.Module):
     def __init__(self, filters=[64, 128, 256, 384], temperature=0.5, n_bins=52):
-        super(MyUNet, self).__init__()
+        super(CardPoseCNN, self).__init__()
 
         self.n_bins = n_bins
+        self.temperature = temperature
 
         # Down path (normal convolutions)
         self.conv1 = nn.Conv2d(3, filters[0], kernel_size=3, padding=1)
@@ -35,9 +36,7 @@ class MyUNet(nn.Module):
         self.fc1 = nn.Linear(2400 + filters[3], 512)
         self.fc2 = nn.Linear(512, 512)
         self.fc_out_detect = nn.Linear(512, 8)
-        self.fc_out_ncards = nn.Linear(512, self.n_bins)
-
-        self.temperature = temperature
+        self.fc_out_ncards = nn.Linear(512, self.n_bins) if n_bins > 0 else nn.Linear(512, 1)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -69,7 +68,7 @@ class MyUNet(nn.Module):
         # x_mask = self.sigmoid(x_mask) # comment this depending on the loss you use?
         x_mask = self.softmax(x_mask.view(*x_mask.size()[:2], -1)).view_as(x_mask)
 
-        # Predicting the coordinates of the points
+        # Predicting point visibility and number of cards
         # combine encoder + detached decoder outputs... will it work?
         x_reg = torch.cat([self.flat(self.adaptAvgPool(x_conv4)), self.flat(self.adaptMaxPool(x_mask.detach()))], dim=1)
         x_reg = self.fc1(x_reg)
@@ -78,10 +77,14 @@ class MyUNet(nn.Module):
         # Point visibility (detected: yes/no)
         out_visibility = self.sigmoid(self.fc_out_detect(x_reg))
 
-        # Number of cards: a probability distribution instead of a single scalar?)
-        # Based on these sources:
-        #   - https://indatalabs.com/blog/head-pose-estimation-with-cv
-        #   - THIS paper: https://arxiv.org/pdf/1710.00925.pdf
-        out_ncards_distrib_logits = self.fc_out_ncards(x_reg) / self.temperature
+        if self.n_bins > 0:
+            # Number of cards: a probability distribution instead of a single scalar?)
+            # Based on these sources:
+            #   - https://indatalabs.com/blog/head-pose-estimation-with-cv
+            #   - THIS paper: https://arxiv.org/pdf/1710.00925.pdf
+            out_ncards = self.fc_out_ncards(x_reg) / self.temperature
+        else:
+            # A single number (percentage of cards, between 0 and 1)
+            out_ncards = self.sigmoid(self.fc_out_ncards(x_reg))
 
-        return x_mask, out_visibility, out_ncards_distrib_logits
+        return x_mask, out_visibility, out_ncards
