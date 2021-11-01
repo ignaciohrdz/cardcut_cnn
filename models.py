@@ -6,11 +6,12 @@ import torch.nn.functional as F
 
 # Read this paper? https://arxiv.org/pdf/1804.06208
 class CardPoseCNN(nn.Module):
-    def __init__(self, filters=[64, 128, 256, 384], temperature=0.5, n_bins=52):
+    def __init__(self, filters=[64, 128, 256, 384], map_size=(15, 20), temperature=0.5, n_bins=52):
         super(CardPoseCNN, self).__init__()
 
         self.n_bins = n_bins
         self.temperature = temperature
+        self.map_size = map_size
 
         # Down path (normal convolutions)
         self.conv1 = nn.Conv2d(3, filters[0], kernel_size=3, padding=1)
@@ -27,16 +28,16 @@ class CardPoseCNN(nn.Module):
         # Pooling and activations
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.adaptAvgPool = nn.AdaptiveAvgPool2d(1)
-        self.adaptMaxPool = nn.AdaptiveMaxPool2d((15, 20))
+        self.adaptMaxPool = nn.AdaptiveMaxPool2d(self.map_size)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
         self.softmax = nn.Softmax(2)
 
         self.flat = nn.Flatten()
-        self.fc1 = nn.Linear(2400 + filters[3], 512)  # 2400 = 15 x 20 (from Adapt Max Pool)
-        self.fc2 = nn.Linear(512, 512)
-        self.fc_out_detect = nn.Linear(512, 8)
-        self.fc_out_ncards = nn.Linear(512, self.n_bins) if n_bins > 0 else nn.Linear(512, 1)
+        self.fc1 = nn.Linear((map_size[0]*map_size[1]*8) + filters[3], 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc_out_detect = nn.Linear(256, 8)
+        self.fc_out_ncards = nn.Linear(256, self.n_bins) if n_bins > 0 else nn.Linear(256, 1)
 
     def forward(self, x):
         x = self.conv1(x)

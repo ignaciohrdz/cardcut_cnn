@@ -40,7 +40,7 @@ dataset_val.set_image_shape_manual(60, 80)
 # dataset.create_mask_dataset()
 # dataset.show_dataset_contours()
 
-num_epochs = 25
+num_epochs = 20
 batch_size = 32
 validation_split = .2
 shuffle_dataset = True
@@ -75,7 +75,8 @@ validation_loader = torch.utils.data.DataLoader(dataset_val,
 stage_loaders = {'train': train_loader,
                  'validation': validation_loader}
 
-n_cards_bins = 52  # Use -1 to predict a single scalar instead of N logits
+# Use -1 to predict a single scalar instead of N logits, otherwise use 52, 40, 48...depending on the deck
+n_cards_bins = -1
 model = CardPoseCNN(temperature=0.5, n_bins=n_cards_bins)
 model.to(device)
 
@@ -185,7 +186,7 @@ plt.plot(range(num_epochs), running_loss_history_separate['validation']['loss_ca
 plt.legend(['Train', 'Validation'])
 plt.title('N_Card loss (card count)')
 plt.xlabel('Epoch')
-plt.ylabel('CE Loss')
+plt.ylabel('N_Card Loss')
 
 plt.subplot(1, 3, 2)
 plt.plot(range(num_epochs), running_loss_history_separate['train']['loss_mask'])
